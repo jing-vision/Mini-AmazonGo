@@ -16,11 +16,14 @@
     <Filter Include="Blocks">
       <UniqueIdentifier>{7BF91F5E-B459-4C4F-AAC6-DBB635B0C795}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Blocks\OSC">
-      <UniqueIdentifier>{EA77E63B-E67C-4FB8-AE98-0E374EFFD3D7}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Blocks\VNM">
       <UniqueIdentifier>{c2556b12-30fc-4505-b3a9-9c09e412ff3d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Blocks\imgui">
+      <UniqueIdentifier>{1a733c13-e6d5-41df-bb36-cedc9f3ad14f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Blocks\imgui\lib">
+      <UniqueIdentifier>{70a5dd82-5d4a-49d8-b419-91bc3a63bdc5}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -33,11 +36,20 @@
     <ClCompile Include="..\..\Cinder\blocks\Cinder-VNM\src\MiniConfig.cpp">
       <Filter>Blocks\VNM</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\BlobTracker.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="..\..\Cinder\blocks\Cinder-ImGui\src\CinderImGui.cpp">
+      <Filter>Blocks\imgui</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Cinder\blocks\OSC\src\cinder\osc\Osc.cpp">
-      <Filter>Blocks\OSC</Filter>
+    <ClCompile Include="..\..\Cinder\blocks\Cinder-ImGui\lib\imgui\imgui.cpp">
+      <Filter>Blocks\imgui\lib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Cinder\blocks\Cinder-ImGui\lib\imgui\imgui_draw.cpp">
+      <Filter>Blocks\imgui\lib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Cinder\blocks\Cinder-ImGui\lib\imgui\imgui_demo.cpp">
+      <Filter>Blocks\imgui\lib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Cinder\blocks\Cinder-VNM\src\AssetManager.cpp">
+      <Filter>Blocks\VNM</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -50,11 +62,17 @@
     <ClInclude Include="..\..\Cinder\blocks\Cinder-VNM\include\MiniConfig.h">
       <Filter>Blocks\VNM</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Cinder\blocks\OSC\src\cinder\osc\Osc.h">
-      <Filter>Blocks\OSC</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Cinder\blocks\Cinder-OpenCV3\include\CinderOpenCV.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Cinder\blocks\Cinder-ImGui\include\CinderImGui.h">
+      <Filter>Blocks\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Cinder\blocks\Cinder-ImGui\lib\imgui\imgui.h">
+      <Filter>Blocks\imgui\lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Cinder\blocks\Cinder-VNM\include\AssetManager.h">
+      <Filter>Blocks\VNM</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

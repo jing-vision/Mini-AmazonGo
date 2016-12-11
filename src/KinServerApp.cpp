@@ -2,47 +2,63 @@
 #include "cinder/app/App.h"
 #include "cinder/gl/gl.h"
 #include "cinder/gl/scoped.h"
-#include "cinder/params/Params.h"
 #include "cinder/Log.h"
-#include "cinder/PolyLine.h"
-
-#include "cinder/osc/Osc.h"
-#include "CinderOpenCV.h"
-#include "BlobTracker.h"
+#include <vector>
 
 #include "DepthSensor.h"
-#include "Cinder-VNM/include/MiniConfig.h"
+#include "Cinder-VNM/include/MiniConfigImgui.h"
+#include "Cinder-VNM/include/AssetManager.h"
 #include "Cinder-VNM/include/TextureHelper.h"
+
+#include "CinderImGui.h"
 
 using namespace ci;
 using namespace ci::app;
+using namespace std;
+
+struct MonitorItem
+{
+    string	name;
+    Area   bbox;
+    gl::Texture2dRef tex;
+
+    void load()
+    {
+
+    }
+
+    void save()
+    {
+
+    }
+};
+
+static const MonitorItem* selection;
 
 class KinServerApp : public App
 {
 public:
+
+    vector<MonitorItem>	mItems;
+    int selectedItem = 0;
+
     void setup() override
     {
+        mItems = {
+            { "Item0", { 10, 10, 100, 100 }, nullptr },
+        };
         const auto& args = getCommandLineArgs();
         readConfig();
         log::makeLogger<log::LoggerFile>();
 
-        {
-            mParams = createConfigUI({ 400, 600 });
-            std::vector<string> smoothNames = { "Off", "Light", "Middle", "High" };
-            ADD_ENUM_TO_INT(mParams, TRACKING_SMOOTH, smoothNames);
-
-            mParams->addParam("FPS", &mFps, true);
-            mParams->addButton("Set Bg", std::bind(&KinServerApp::updateBack, this));
-            mParams->addButton("Reset In/Out", [] {
-                INPUT_X1 = INPUT_Y1 = OUTPUT_X1 = OUTPUT_Y1 = 0;
-                INPUT_X2 = INPUT_Y2 = OUTPUT_X2 = OUTPUT_Y2 = 1;
-            });
-        }
+        createConfigImgui();
+        //mParams->addParam("FPS", &mFps, true);
+        //mParams->addButton("Set Bg", std::bind(&KinServerApp::updateBack, this));
 
         ds::DeviceType type = ds::DeviceType(_SENSOR_TYPE);
         ds::Option option;
-        option.enableDepth = !_INFRARED_MODE;
-        option.enableInfrared = _INFRARED_MODE;
+        option.enableColor = true;
+        option.enableDepth = true;
         mDevice = ds::Device::create(type, option);
         if (!mDevice->isValid())
         {
@@ -50,44 +66,19 @@ public:
             return;
         }
 
-        if (_INFRARED_MODE)
-        {
-            mDirtyConnection = mDevice->signalInfraredDirty.connect(std::bind(&KinServerApp::updateDepthRelated, this));
-        }
-        else
-        {
-            mDirtyConnection = mDevice->signalDepthDirty.connect(std::bind(&KinServerApp::updateDepthRelated, this));
-        }
+        mDirtyConnection = mDevice->signalColorDirty.connect(std::bind(&KinServerApp::updateColorRelated, this));
+        mDirtyConnection = mDevice->signalDepthDirty.connect(std::bind(&KinServerApp::updateDepthRelated, this));
 
         mDepthW = mDevice->getDepthSize().x;
         mDepthH = mDevice->getDepthSize().y;
-        mDiffMat = cv::Mat1b(mDepthH, mDepthW);
-        mDiffChannel = Channel(mDepthW, mDepthH, mDiffMat.step, 1,
-            mDiffMat.ptr());
-
-        mOscSender = std::make_shared<osc::SenderUdp>(10000, _ADDRESS, _TUIO_PORT);
-        mOscSender->bind();
+        mDiffChannel = Channel8u(mDepthW, mDepthH);
 
         getWindow()->setSize(1024, 768);
+        getWindow()->setTitle("SmartMonitor");
+        
+        gl::disableAlphaBlending();
 
-        try
-        {
-            mLogo = gl::Texture::create(loadImage(loadAsset("logo.png")));
-        }
-        catch (std::exception& e)
-        {
-            console() << e.what() << std::endl;
-        }
-
-        try
-        {
-            mShader = gl::GlslProg::create(loadAsset("depthMap.vs"), loadAsset("depthMap.fs"));
-            mShader->uniform("image", 0);
-        }
-        catch (std::exception& e)
-        {
-            console() << e.what() << std::endl;
-        }
+        mShader = am::glslProg("depthMap.vs", "depthMap.fs");
     }
 
     void resize() override
@@ -110,29 +101,11 @@ public:
                     );
             }
         }
-        if (mLogo)
-        {
-            mLayout.logoRect = Rectf(
-                mLayout.halfW + mLayout.spc,
-                mLayout.spc,
-                mLayout.width - mLayout.spc,
-                mLayout.spc + (mLayout.halfW - mLayout.spc * 2) / mLogo->getAspectRatio()
-                );
-        }
-
-        mParams->setPosition(mLayout.canvases[1].getUpperLeft());
     }
 
     void draw() override
     {
         gl::clear(ColorA::gray(0.5f));
-
-        if (mLogo)
-        {
-            gl::enableAlphaBlending();
-            gl::draw(mLogo, mLayout.logoRect);
-            gl::disableAlphaBlending();
-        }
 
         if (mDepthTexture)
         {
@@ -144,7 +117,21 @@ public:
             gl::ScopedTextureBind tex2(mDiffTexture);
             gl::drawSolidRect(mLayout.canvases[2]);
         }
-        visualizeBlobs(mBlobTracker);
+        gl::draw(mColorTexture, mLayout.canvases[1]);
+
+        int idx = 0;
+        for (auto object : mItems)
+        {
+            if (idx = selectedItem)
+                gl::color(ColorA(1, 0, 0, 0.5f));
+
+            gl::drawStrokedRoundedRect(object.bbox, 0.1f);
+            gl::drawStringCentered(object.name, vec2(object.bbox.getUL()) - vec2(0, 5), ColorA::black());
+
+            idx++;
+
+            gl::color(ColorA::white());
+        }
     }
 
     void keyUp(KeyEvent event) override
@@ -160,203 +147,104 @@ public:
     {
         mFps = getAverageFps();
 
-        mInputRoi.set(
-            INPUT_X1 * mDepthW,
-            INPUT_Y1 * mDepthH,
-            INPUT_X2 * mDepthW,
-            INPUT_Y2 * mDepthH
-            );
-        mOutputMap.set(
-            OUTPUT_X1 * mDepthW,
-            OUTPUT_Y1 * mDepthH,
-            OUTPUT_X2 * mDepthW,
-            OUTPUT_Y2 * mDepthH
-            );
+        selection = &mItems[selectedItem];
+
+        {
+            ui::ScopedWindow window("Items");
+            if (ui::Button("Add"))
+            {
+                static int objCount = mItems.size();
+
+                MonitorItem item;
+                item.bbox = { 100, 100, 150, 150 };
+                item.name = "item" + to_string(objCount++);
+                mItems.push_back(item);
+                selection = &mItems[selectedItem];
+            }
+            if (selection) {
+                ui::SameLine();
+                if (ui::Button("Remove")) {
+                    auto it = std::find_if(mItems.begin(), mItems.end(), [](const MonitorItem& obj) { return &obj == selection; });
+                    if (it != mItems.end()) {
+                        mItems.erase(it);
+                        selection = nullptr;
+                    }
+                }
+            }
+
+            // selectable list
+            ui::ListBoxHeader("");
+            int idx = 0;
+            for (const auto& object : mItems)
+            {
+                if (ui::Selectable(object.name.c_str(), selection == &object))
+                {
+                    selection = &object;
+                    selectedItem = idx;
+                }
+                idx++;
+            }
+            ui::ListBoxFooter();
+        }
+
+        // The Object Inspector
+        if (selection) {
+            ui::ScopedWindow window("Inspector");
+
+            MonitorItem* object = (MonitorItem*)selection;
+            ui::InputText("name", &object->name);
+            // getter/setters are a bit longer but still possible
+            int32_t* ptr = &object->bbox.x1;
+            ui::DragInt4("bbox", ptr);
+        }
+
     }
 
 private:
 
+    void updateColorRelated()
+    {
+        updateTexture(mColorTexture, mDevice->colorSurface);
+    }
+        
     void updateDepthRelated()
     {
-        mTargetChannel = _INFRARED_MODE ? &mDevice->infraredChannel : &mDevice->depthChannel;
-
-        updateTexture(mDepthTexture, *mTargetChannel);
+        updateTexture(mDepthTexture, mDevice->depthChannel);
 
         if (!mBackTexture)
         {
             updateBack();
         }
 
-        mDiffMat.setTo(cv::Scalar::all(0));
+        //mDiffMat.setTo(cv::Scalar::all(0));
 
-        int cx = CENTER_X * mDepthW;
-        int cy = CENTER_Y * mDepthH;
-        int radius = RADIUS * mDepthH;
-        int radius_sq = radius * radius;
-
-        float depthToMmScale = _INFRARED_MODE ? 0.01 : mDevice->getDepthToMmScale();
+        float depthToMmScale = mDevice->getDepthToMmScale();
         float minThresholdInDepthUnit = MIN_THRESHOLD_MM / depthToMmScale;
         float maxThresholdInDepthUnit = MAX_THRESHOLD_MM / depthToMmScale;
 
-        for (int yy = mInputRoi.y1; yy < mInputRoi.y2; yy++)
+        for (int yy = 0; yy < mDepthH; yy++)
         {
             // TODO: cache row pointer
             int y = yy;
-            for (int xx = mInputRoi.x1; xx < mInputRoi.x2; xx++)
+            for (int xx = 0; xx < mDepthW; xx++)
             {
                 int x = LEFT_RIGHT_FLIPPED ? (mDepthW - xx) : xx;
                 auto bg = *mBackChannel.getData(x, y);
-                auto dep = *mTargetChannel->getData(x, y);
+                auto dep = *mDevice->depthChannel.getData(x, y);
                 auto diff = dep - bg;
                 if (dep > 0 && diff > minThresholdInDepthUnit && diff < maxThresholdInDepthUnit)
                 {
-                    // TODO: optimize
-                    if (!CIRCLE_MASK_ENABLED || (cx - x) * (cx - x) + (cy - y) * (cy - y) < radius_sq)
-                    {
-                        mDiffMat(yy, xx) = 255;
-                    }
+                    //mDiffMat(yy, xx) = 255;
                 }
             }
         }
 
-        if (TRACKING_SMOOTH > 0)
-        {
-            cv::Mat element = getStructuringElement(cv::MORPH_RECT, cv::Size(TRACKING_SMOOTH * 2 + 1, TRACKING_SMOOTH * 2 + 1),
-                cv::Point(TRACKING_SMOOTH, TRACKING_SMOOTH));
-            cv::morphologyEx(mDiffMat, mDiffMat, cv::MORPH_OPEN, element);
-        }
-
         updateTexture(mDiffTexture, mDiffChannel);
-        std::vector<Blob> blobs;
-        BlobFinder::Option option;
-        option.minArea = MIN_AREA;
-        option.handOnlyMode = FINGER_MODE_ENABLED;
-        option.handDistance = FINGER_SIZE;
-        BlobFinder::execute(mDiffMat, blobs, option);
-        mBlobTracker.trackBlobs(blobs);
-        sendTuioMessage(*mOscSender, mBlobTracker);
-    }
-
-    void visualizeBlobs(const BlobTracker &blobTracker)
-    {
-        static uint8_t sPalette[][3] =
-        {
-            { 255, 0, 0 },
-            { 122, 0, 0 },
-            { 255, 255, 0 },
-            { 122, 122, 0 },
-            { 255, 0, 255 },
-            { 122, 0, 122 },
-            { 0, 0, 255 },
-            { 0, 0, 122 },
-            { 0, 255, 255 },
-            { 0, 122, 122 },
-        };
-        const size_t sPaletteCount = _countof(sPalette);
-
-        vec2 scale;
-        scale.x = (mLayout.halfW - mLayout.spc * 2) / mDepthW;
-        scale.y = (mLayout.halfH - mLayout.spc * 2) / mDepthH;
-        gl::pushModelMatrix();
-        gl::translate(mLayout.canvases[2].getUpperLeft());
-        gl::scale(scale);
-
-        if (CIRCLE_MASK_ENABLED)
-        {
-            float cx = CENTER_X * mDepthW;
-            if (LEFT_RIGHT_FLIPPED) cx = mDepthW - cx;
-            float cy = CENTER_Y * mDepthH;
-            float radius = RADIUS * mDepthH;
-            gl::drawStrokedCircle(vec2(cx, cy), radius, 40);
-        }
-        {
-            gl::ScopedColor scope(ColorAf(1, 0, 0, 0.5f));
-            gl::drawStrokedRect(mInputRoi);
-        }
-        {
-            gl::ScopedColor scope(ColorAf(0, 1, 0, 0.5f));
-            gl::drawStrokedRect(mOutputMap);
-        }
-
-        char idName[10];
-        for (const auto &blob : blobTracker.trackedBlobs)
-        {
-            int idx = blob.id % sPaletteCount;
-            gl::color(Color8u(sPalette[idx][0], sPalette[idx][1], sPalette[idx][2]));
-            PolyLine2 line;
-            for (const auto &pt : blob.pts)
-            {
-                line.push_back(vec2(pt.x, pt.y));
-            }
-            line.setClosed();
-            gl::drawSolid(line);
-            sprintf(idName, "#%d", blob.id);
-            gl::drawStringCentered(idName, vec2(blob.center.x, blob.center.y));
-        }
-        gl::color(Color::white());
-        gl::popModelMatrix();
-    }
-
-    int remapTuioId(int srcId)
-    {
-#define kMagicNumber 100
-        return (srcId % kMagicNumber) + kMagicNumber * SERVER_ID;
-    }
-
-    void sendTuioMessage(osc::SenderUdp &sender, const BlobTracker &blobTracker)
-    {
-        osc::Bundle bundle;
-
-        osc::Message alive;
-        {
-            alive.setAddress("/tuio/2Dcur");
-            alive.append("alive");
-        }
-
-        osc::Message fseq;
-        {
-            fseq.setAddress("/tuio/2Dcur");
-            fseq.append("fseq");
-            fseq.append((int32_t)getElapsedFrames());
-        }
-
-        SERVER_COUNT = math<int>::max(1, SERVER_COUNT);
-        SERVER_ID = math<int>::clamp(SERVER_ID, 0, SERVER_COUNT - 1);
-        float newRegion = 1 / (float)SERVER_COUNT;
-        for (const auto &blob : blobTracker.trackedBlobs)
-        {
-            //Point2f center(blob.center.x + depthOrigin.x, blob.center.y + depthOrigin.y);
-            vec2 center(blob.center.x, blob.center.y);
-
-            if (!mInputRoi.contains(center)) continue;
-
-            int blobId = remapTuioId(blob.id);
-            osc::Message set;
-            set.setAddress("/tuio/2Dcur");
-            set.append("set");
-            set.append(blobId);             // id
-            float mappedX = lmap(center.x / mDepthW, INPUT_X1, INPUT_X2, OUTPUT_X1, OUTPUT_X2);
-            mappedX = (SERVER_ID + mappedX) * newRegion;
-            float mappedY = lmap(center.y / mDepthH, INPUT_Y1, INPUT_Y2, OUTPUT_Y1, OUTPUT_Y2);
-            set.append(mappedX);
-            set.append(mappedY);
-            set.append(blob.velocity.x / mOutputMap.getWidth());
-            set.append(blob.velocity.y / mOutputMap.getHeight());
-            set.append(0);     // m
-            bundle.append(set);                         // add message to bundle
-
-            alive.append(blobId);               // add blob to list of ALL active IDs
-        }
-
-        bundle.append(alive);    //add message to bundle
-        bundle.append(fseq);     //add message to bundle
-
-        sender.send(bundle); //send bundle
     }
 
     void updateBack()
     {
-        mBackChannel = mTargetChannel->clone();
+        mBackChannel = mDevice->depthChannel.clone();
         updateTexture(mBackTexture, mBackChannel);
     }
 
@@ -374,28 +262,19 @@ private:
         Rectf logoRect;
     } mLayout;
 
-    ci::Channel16u* mTargetChannel = nullptr;
     ds::DeviceRef mDevice;
     signals::Connection mDirtyConnection;
-    params::InterfaceGlRef mParams;
-    std::shared_ptr<osc::SenderUdp> mOscSender;
     int mDepthW, mDepthH;
 
     gl::TextureRef mDepthTexture;
+    gl::TextureRef mColorTexture;
 
     // vision
     Channel16u mBackChannel;
     gl::TextureRef mBackTexture;
-    BlobTracker mBlobTracker;
 
-    Channel mDiffChannel;
-    cv::Mat1b mDiffMat;
+    Channel8u mDiffChannel;
     gl::TextureRef mDiffTexture;
-
-    Rectf mInputRoi;
-    Rectf mOutputMap;
-
-    gl::TextureRef mLogo;
 
     gl::GlslProgRef	mShader;
 };
