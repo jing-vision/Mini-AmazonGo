@@ -3,6 +3,8 @@
 #include "cinder/gl/gl.h"
 #include "cinder/gl/scoped.h"
 #include "cinder/Log.h"
+#include "cinder/Json.h"
+
 #include <vector>
 
 #include "DepthSensor.h"
@@ -19,34 +21,71 @@ using namespace std;
 struct MonitorItem
 {
     string	name;
-    Area   bbox;
-    gl::Texture2dRef tex;
+    ivec2   pos;
+    ivec2   size;
+    gl::Texture2dRef depthTex;
+    gl::Texture2dRef colorTex;
+    Channel16u depthChannel;
+    Surface colorSurface;
+
+    Rectf getRectfInDepth() const
+    {
+        return Rectf(pos.x, pos.y, pos.x + size.x, pos.y + size.y);
+    }
+
+    Rectf getRectfInColor() const
+    {
+        return Rectf(pos.x, pos.y, pos.x + size.x, pos.y + size.y);
+    }
+
+    void grab(const Channel16u& depth, const Surface& color)
+    {
+        depthChannel = depth.clone(Area(getRectfInDepth()), true);
+        auto rect = getRectfInColor();
+        float xScale = color.getWidth() / (float)depth.getWidth();
+        float yScale = color.getHeight() / (float)depth.getHeight();
+        rect.x1 *= xScale;
+        rect.x2 *= xScale;
+        rect.y1 *= yScale;
+        rect.y2 *= yScale;
+        colorSurface = color.clone(Area(rect), true);
+        _createTex();
+    }
+
+    void _createTex()
+    {
+        if (depthChannel.getWidth() > 0)
+            depthTex = gl::Texture2d::create(depthChannel);
+        if (colorSurface.getWidth() > 0)
+            colorTex = gl::Texture2d::create(colorSurface);
+    }
 
     void load()
     {
-
+        depthChannel = *am::channel16u(name + "_depth.png");
+        colorSurface = *am::surface(name + "_color.png");
+        _createTex();
     }
 
     void save()
     {
-
+        if (depthChannel.getWidth() > 0)
+        {
+            writeImage(getAssetPath("") / (name + "_depth.png"), depthChannel);
+            writeImage(getAssetPath("") / (name + "_color.png"), colorSurface);
+        }
     }
 };
-
-static const MonitorItem* selection;
 
 class KinServerApp : public App
 {
 public:
 
     vector<MonitorItem>	mItems;
-    int selectedItem = 0;
+    int selectedItem = -1;
 
     void setup() override
     {
-        mItems = {
-            { "Item0", { 10, 10, 100, 100 }, nullptr },
-        };
         const auto& args = getCommandLineArgs();
         readConfig();
         log::makeLogger<log::LoggerFile>();
@@ -71,6 +110,9 @@ public:
 
         mDepthW = mDevice->getDepthSize().x;
         mDepthH = mDevice->getDepthSize().y;
+        mColorW = mDevice->getColorSize().x;
+        mColorH = mDevice->getColorSize().y;
+
         mDiffChannel = Channel8u(mDepthW, mDepthH);
 
         getWindow()->setSize(1024, 768);
@@ -119,18 +161,30 @@ public:
         }
         gl::draw(mColorTexture, mLayout.canvases[1]);
 
-        int idx = 0;
-        for (auto object : mItems)
+        int canvasIds[] = { 0, 1 };
+        for (int i : canvasIds)
         {
-            if (idx = selectedItem)
-                gl::color(ColorA(1, 0, 0, 0.5f));
+            vec2 scale;
+            scale.x = (mLayout.halfW - mLayout.spc * 2) / mDepthW;
+            scale.y = (mLayout.halfH - mLayout.spc * 2) / mDepthH;
+            gl::pushModelMatrix();
+            gl::ScopedModelMatrix model;
+            gl::translate(mLayout.canvases[i].getUpperLeft());
+            gl::scale(scale);
 
-            gl::drawStrokedRoundedRect(object.bbox, 0.1f);
-            gl::drawStringCentered(object.name, vec2(object.bbox.getUL()) - vec2(0, 5), ColorA::black());
+            int idx = 0;
+            for (auto& item : mItems)
+            {
+                if (idx == selectedItem)
+                    gl::color(ColorA(1, 0, 0, 0.5f));
 
-            idx++;
+                gl::drawStrokedRoundedRect(item.getRectfInColor(), 5.0f);
+                gl::drawStringCentered(item.name, vec2(item.pos), ColorA::white());
 
-            gl::color(ColorA::white());
+                idx++;
+
+                gl::color(ColorA::white());
+            }
         }
     }
 
@@ -143,11 +197,29 @@ public:
         }
     }
 
+    void _load()
+    {
+        auto content = am::str("items.txt");
+        if (content.empty()) return;
+
+        mItems.clear();
+
+        auto itemNames = split(content, ',');
+        for (auto& name : itemNames)
+        {
+            if (name.empty()) continue;
+
+            MonitorItem item;
+            item.name = name;
+            item.load();
+
+            mItems.emplace_back(item);
+        }
+    }
+
     void update() override
     {
         mFps = getAverageFps();
-
-        selection = &mItems[selectedItem];
 
         {
             ui::ScopedWindow window("Items");
@@ -156,18 +228,39 @@ public:
                 static int objCount = mItems.size();
 
                 MonitorItem item;
-                item.bbox = { 100, 100, 150, 150 };
+                item.pos = { 100, 100 };
+                item.size = { 50, 50 };
                 item.name = "item" + to_string(objCount++);
+                item.grab(mDevice->depthChannel, mDevice->colorSurface);
+
                 mItems.push_back(item);
-                selection = &mItems[selectedItem];
             }
-            if (selection) {
+            if (selectedItem != -1)
+            {
                 ui::SameLine();
-                if (ui::Button("Remove")) {
-                    auto it = std::find_if(mItems.begin(), mItems.end(), [](const MonitorItem& obj) { return &obj == selection; });
-                    if (it != mItems.end()) {
-                        mItems.erase(it);
-                        selection = nullptr;
+                if (ui::Button("Remove"))
+                {
+                    mItems.erase(mItems.begin() + selectedItem);
+                    selectedItem = -1;
+                }
+            }
+
+            if (ui::Button("Load"))
+            {
+                _load();
+            }
+
+            ui::SameLine();
+            if (ui::Button("Save"))
+            {
+                string filename = (getAssetPath("") / "items.json").string();
+                ofstream ofs(filename);
+                if (ofs)
+                {
+                    for (auto& item : mItems)
+                    {
+                        ofs << item.name << ",";
+                        item.save();
                     }
                 }
             }
@@ -175,11 +268,10 @@ public:
             // selectable list
             ui::ListBoxHeader("");
             int idx = 0;
-            for (const auto& object : mItems)
+            for (auto& item : mItems)
             {
-                if (ui::Selectable(object.name.c_str(), selection == &object))
+                if (ui::Selectable(item.name.c_str(), idx == selectedItem))
                 {
-                    selection = &object;
                     selectedItem = idx;
                 }
                 idx++;
@@ -187,15 +279,31 @@ public:
             ui::ListBoxFooter();
         }
 
-        // The Object Inspector
-        if (selection) {
+        // The item Inspector
+        if (selectedItem != -1)
+        {
             ui::ScopedWindow window("Inspector");
 
-            MonitorItem* object = (MonitorItem*)selection;
-            ui::InputText("name", &object->name);
+            MonitorItem& item = mItems[selectedItem];
+            ui::InputText("name", &item.name);
+            if (ui::Button("grab"))
+            {
+                item.grab(mDevice->depthChannel, mDevice->colorSurface);
+            }
+
             // getter/setters are a bit longer but still possible
-            int32_t* ptr = &object->bbox.x1;
-            ui::DragInt4("bbox", ptr);
+            ui::DragInt2("pos", &item.pos.x);
+            ui::DragInt2("size", &item.size.x);
+
+            if (item.colorTex && item.depthTex)
+            {
+                auto size = item.colorTex->getSize();
+                ui::NewLine();
+                ui::Image(item.depthTex, size);
+
+                ui::NewLine();
+                ui::Image(item.colorTex, size);
+            }
         }
 
     }
@@ -265,6 +373,7 @@ private:
     ds::DeviceRef mDevice;
     signals::Connection mDirtyConnection;
     int mDepthW, mDepthH;
+    int mColorW, mColorH;
 
     gl::TextureRef mDepthTexture;
     gl::TextureRef mColorTexture;
