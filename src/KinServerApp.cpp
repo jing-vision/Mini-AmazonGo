@@ -83,6 +83,7 @@ public:
 
     vector<MonitorItem>	mItems;
     int selectedItem = -1;
+    bool showTestWindow = false;
 
     void setup() override
     {
@@ -221,6 +222,31 @@ public:
     {
         mFps = getAverageFps();
 
+        // create the main menu bar
+        {
+            ui::ScopedMainMenuBar menuBar;
+
+            // add a file menu
+            if (ui::BeginMenu("File")){
+                ui::MenuItem("Open");
+                ui::MenuItem("Save");
+                ui::MenuItem("Save As");
+                ui::EndMenu();
+            }
+
+            // and a view menu
+            if (ui::BeginMenu("View")){
+                ui::MenuItem("TestWindow", nullptr, &showTestWindow);
+                ui::EndMenu();
+            }
+        }
+
+        if (showTestWindow)
+        {
+            // have a look at this function for more examples
+            ui::ShowTestWindow();
+        }
+
         {
             ui::ScopedWindow window("Items");
             if (ui::Button("Add"))
@@ -277,35 +303,36 @@ public:
                 idx++;
             }
             ui::ListBoxFooter();
-        }
 
-        // The item Inspector
-        if (selectedItem != -1)
-        {
-            ui::ScopedWindow window("Inspector");
-
-            MonitorItem& item = mItems[selectedItem];
-            ui::InputText("name", &item.name);
-            if (ui::Button("grab"))
+            if (selectedItem != -1)
             {
-                item.grab(mDevice->depthChannel, mDevice->colorSurface);
-            }
+                if (ui::BeginPopupContextItem("item context menu"))
+                {
+                    MonitorItem& item = mItems[selectedItem];
+                    ui::InputText("name", &item.name);
+                    if (ui::Button("grab"))
+                    {
+                        item.grab(mDevice->depthChannel, mDevice->colorSurface);
+                    }
 
-            // getter/setters are a bit longer but still possible
-            ui::DragInt2("pos", &item.pos.x);
-            ui::DragInt2("size", &item.size.x);
+                    // getter/setters are a bit longer but still possible
+                    ui::DragInt2("pos", &item.pos.x);
+                    ui::DragInt2("size", &item.size.x);
 
-            if (item.colorTex && item.depthTex)
-            {
-                auto size = item.colorTex->getSize();
-                ui::NewLine();
-                ui::Image(item.depthTex, size);
+                    if (item.colorTex && item.depthTex)
+                    {
+                        auto size = item.colorTex->getSize();
+                        ui::NewLine();
+                        ui::Image(item.depthTex, size);
 
-                ui::NewLine();
-                ui::Image(item.colorTex, size);
+                        ui::NewLine();
+                        ui::Image(item.colorTex, size);
+                    }
+
+                    ui::EndPopup();
+                }
             }
         }
-
     }
 
 private:
