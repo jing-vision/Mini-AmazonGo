@@ -25,8 +25,10 @@ struct MonitorItem
     ivec2   size;
     gl::Texture2dRef depthTex;
     gl::Texture2dRef colorTex;
+    gl::Texture2dRef processTex;
     Channel16u depthChannel;
     Surface colorSurface;
+    Channel8u processChannel;
 
     Rectf getRectfInDepth() const
     {
@@ -41,6 +43,8 @@ struct MonitorItem
     void grab(const Channel16u& depth, const Surface& color)
     {
         depthChannel = depth.clone(Area(getRectfInDepth()), true);
+        processChannel = { size.x, size.y };
+
         auto rect = getRectfInColor();
         float xScale = color.getWidth() / (float)depth.getWidth();
         float yScale = color.getHeight() / (float)depth.getHeight();
@@ -54,16 +58,17 @@ struct MonitorItem
 
     void _createTex()
     {
-        if (depthChannel.getWidth() > 0)
-            depthTex = gl::Texture2d::create(depthChannel);
-        if (colorSurface.getWidth() > 0)
-            colorTex = gl::Texture2d::create(colorSurface);
+        updateTexture(depthTex, depthChannel);
+        updateTexture(colorTex, colorSurface);
+        updateTexture(processTex, processChannel);
     }
 
     void load()
     {
         depthChannel = *am::channel16u(name + "_depth.png");
         colorSurface = *am::surface(name + "_color.png");
+        processChannel = { depthChannel.getWidth(), depthChannel.getHeight() };
+
         _createTex();
     }
 
@@ -92,8 +97,6 @@ public:
         log::makeLogger<log::LoggerFile>();
 
         createConfigImgui();
-        //mParams->addParam("FPS", &mFps, true);
-        //mParams->addButton("Set Bg", std::bind(&KinServerApp::updateBack, this));
 
         ds::DeviceType type = ds::DeviceType(_SENSOR_TYPE);
         ds::Option option;
@@ -113,8 +116,6 @@ public:
         mDepthH = mDevice->getDepthSize().y;
         mColorW = mDevice->getColorSize().x;
         mColorH = mDevice->getColorSize().y;
-
-        mDiffChannel = Channel8u(mDepthW, mDepthH);
 
         getWindow()->setSize(1024, 768);
         getWindow()->setTitle("SmartMonitor");
@@ -155,10 +156,6 @@ public:
             gl::ScopedGlslProg prog(mShader);
             gl::ScopedTextureBind tex0(mDepthTexture);
             gl::drawSolidRect(mLayout.canvases[0]);
-            gl::ScopedTextureBind tex1(mBackTexture);
-            gl::drawSolidRect(mLayout.canvases[3]);
-            gl::ScopedTextureBind tex2(mDiffTexture);
-            gl::drawSolidRect(mLayout.canvases[2]);
         }
         gl::draw(mColorTexture, mLayout.canvases[1]);
 
@@ -168,7 +165,6 @@ public:
             vec2 scale;
             scale.x = (mLayout.halfW - mLayout.spc * 2) / mDepthW;
             scale.y = (mLayout.halfH - mLayout.spc * 2) / mDepthH;
-            gl::pushModelMatrix();
             gl::ScopedModelMatrix model;
             gl::translate(mLayout.canvases[i].getUpperLeft());
             gl::scale(scale);
@@ -180,7 +176,7 @@ public:
                     gl::color(ColorA(1, 0, 0, 0.5f));
 
                 gl::drawStrokedRoundedRect(item.getRectfInColor(), 5.0f);
-                gl::drawStringCentered(item.name, vec2(item.pos), ColorA::white());
+                //gl::drawStringCentered(item.name, vec2(item.pos), ColorA::white());
 
                 idx++;
 
@@ -259,7 +255,7 @@ public:
                 item.name = "item" + to_string(objCount++);
                 item.grab(mDevice->depthChannel, mDevice->colorSurface);
 
-                mItems.push_back(item);
+                mItems.emplace_back(item);
             }
             if (selectedItem != -1)
             {
@@ -303,34 +299,32 @@ public:
                 idx++;
             }
             ui::ListBoxFooter();
+        }
 
-            if (selectedItem != -1)
+        if (selectedItem != -1)
+        {
+            ui::ScopedWindow window("Item");
+            MonitorItem& item = mItems[selectedItem];
+            ui::InputText("name", &item.name);
+            if (ui::Button("grab"))
             {
-                if (ui::BeginPopupContextItem("item context menu"))
-                {
-                    MonitorItem& item = mItems[selectedItem];
-                    ui::InputText("name", &item.name);
-                    if (ui::Button("grab"))
-                    {
-                        item.grab(mDevice->depthChannel, mDevice->colorSurface);
-                    }
+                item.grab(mDevice->depthChannel, mDevice->colorSurface);
+            }
 
-                    // getter/setters are a bit longer but still possible
-                    ui::DragInt2("pos", &item.pos.x);
-                    ui::DragInt2("size", &item.size.x);
+            ui::DragInt2("pos", &item.pos.x);
+            ui::DragInt2("size", &item.size.x);
 
-                    if (item.colorTex && item.depthTex)
-                    {
-                        auto size = item.colorTex->getSize();
-                        ui::NewLine();
-                        ui::Image(item.depthTex, size);
+            if (item.colorTex && item.depthTex)
+            {
+                auto size = item.colorTex->getSize();
+                ui::NewLine();
+                ui::Image(item.depthTex, size);
 
-                        ui::NewLine();
-                        ui::Image(item.colorTex, size);
-                    }
+                ui::NewLine();
+                ui::Image(item.colorTex, size);
 
-                    ui::EndPopup();
-                }
+                ui::NewLine();
+                ui::Image(item.processTex, size);
             }
         }
     }
@@ -346,41 +340,33 @@ private:
     {
         updateTexture(mDepthTexture, mDevice->depthChannel);
 
-        if (!mBackTexture)
-        {
-            updateBack();
-        }
-
-        //mDiffMat.setTo(cv::Scalar::all(0));
-
         float depthToMmScale = mDevice->getDepthToMmScale();
-        float minThresholdInDepthUnit = MIN_THRESHOLD_MM / depthToMmScale;
-        float maxThresholdInDepthUnit = MAX_THRESHOLD_MM / depthToMmScale;
+        float minThresholdInDepthUnit = ITEM_HEIGHT_MM / depthToMmScale;
 
-        for (int yy = 0; yy < mDepthH; yy++)
+        for (auto& item : mItems)
         {
-            // TODO: cache row pointer
-            int y = yy;
-            for (int xx = 0; xx < mDepthW; xx++)
+            for (int j = 0; j < item.size.y; j++)
             {
-                int x = LEFT_RIGHT_FLIPPED ? (mDepthW - xx) : xx;
-                auto bg = *mBackChannel.getData(x, y);
-                auto dep = *mDevice->depthChannel.getData(x, y);
-                auto diff = dep - bg;
-                if (dep > 0 && diff > minThresholdInDepthUnit && diff < maxThresholdInDepthUnit)
+                int y = j;
+                for (int i = 0; i < item.size.x; i++)
                 {
-                    //mDiffMat(yy, xx) = 255;
+                    //int x = LEFT_RIGHT_FLIPPED ? (mDepthW - i) : i;
+                    auto bg = *item.depthChannel.getData(i, j);
+                    auto dep = *mDevice->depthChannel.getData(item.pos.x + i, item.pos.y + j);
+                    auto diff = dep - bg;
+                    if (dep > 0 && diff > minThresholdInDepthUnit)
+                    {
+                        *item.processChannel.getData(i, j) = 255;
+                    }
+                    else
+                    {
+                        // TODO: optimize
+                        *item.processChannel.getData(i, j) = 0;
+                    }
                 }
             }
+            updateTexture(item.processTex, item.processChannel);
         }
-
-        updateTexture(mDiffTexture, mDiffChannel);
-    }
-
-    void updateBack()
-    {
-        mBackChannel = mDevice->depthChannel.clone();
-        updateTexture(mBackTexture, mBackChannel);
     }
 
     float mFps = 0;
@@ -404,13 +390,6 @@ private:
 
     gl::TextureRef mDepthTexture;
     gl::TextureRef mColorTexture;
-
-    // vision
-    Channel16u mBackChannel;
-    gl::TextureRef mBackTexture;
-
-    Channel8u mDiffChannel;
-    gl::TextureRef mDiffTexture;
 
     gl::GlslProgRef	mShader;
 };
