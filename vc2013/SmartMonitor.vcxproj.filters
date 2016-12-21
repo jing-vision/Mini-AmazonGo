@@ -90,6 +90,9 @@
     <None Include="..\assets\depthMap.vs">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="..\assets\colorMap.fs">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Xml Include="..\assets\MiniConfig.xml">

@@ -30,22 +30,17 @@ struct MonitorItem
     Surface colorSurface;
     Channel8u processChannel;
 
-    Rectf getRectfInDepth() const
+    Rectf getRect() const
     {
         return Rectf(pos.x, pos.y, pos.x + size.x, pos.y + size.y);
     }
 
-    Rectf getRectfInColor() const
+    void update(const Channel16u& depth, const Surface& color)
     {
-        return Rectf(pos.x, pos.y, pos.x + size.x, pos.y + size.y);
-    }
-
-    void grab(const Channel16u& depth, const Surface& color)
-    {
-        depthChannel = depth.clone(Area(getRectfInDepth()), true);
+        depthChannel = depth.clone(Area(getRect()), true);
         processChannel = { size.x, size.y };
 
-        auto rect = getRectfInColor();
+        auto rect = getRect();
         float xScale = color.getWidth() / (float)depth.getWidth();
         float yScale = color.getHeight() / (float)depth.getHeight();
         rect.x1 *= xScale;
@@ -88,7 +83,6 @@ public:
 
     vector<MonitorItem>	mItems;
     int selectedItem = -1;
-    bool showTestWindow = false;
 
     void setup() override
     {
@@ -102,6 +96,7 @@ public:
         ds::Option option;
         option.enableColor = true;
         option.enableDepth = true;
+        option.enablePointCloud = true;
         mDevice = ds::Device::create(type, option);
         if (!mDevice->isValid())
         {
@@ -109,20 +104,29 @@ public:
             return;
         }
 
-        mDirtyConnection = mDevice->signalColorDirty.connect(std::bind(&KinServerApp::updateColorRelated, this));
-        mDirtyConnection = mDevice->signalDepthDirty.connect(std::bind(&KinServerApp::updateDepthRelated, this));
+        mDevice->signalColorDirty.connect([&] {
+            updateTexture(mColorTexture, mDevice->colorSurface);
+        });
 
-        mDepthW = mDevice->getDepthSize().x;
-        mDepthH = mDevice->getDepthSize().y;
-        mColorW = mDevice->getColorSize().x;
-        mColorH = mDevice->getColorSize().y;
+        mDevice->signalDepthDirty.connect(std::bind(&KinServerApp::updateDepthRelated, this));
+
+        mDevice->signalDepthToColorTableDirty.connect([&] {
+            auto format = gl::Texture::Format()
+                .dataType(GL_FLOAT)
+                .immutableStorage();
+            updateTexture(mDepthToColorTableTexture, mDevice->depthToColorTable, format);
+        });
 
         getWindow()->setSize(1024, 768);
         getWindow()->setTitle("SmartMonitor");
         
         gl::disableAlphaBlending();
 
-        mShader = am::glslProg("depthMap.vs", "depthMap.fs");
+        mDepthShader = am::glslProg("depthMap.vs", "depthMap.fs");
+        mDepthShader->uniform("uDepthTexture", 0);
+        mColorShader = am::glslProg("depthMap.vs", "colorMap.fs");
+        mColorShader->uniform("uColorTexture", 0);
+        mColorShader->uniform("uDepthToColorTableTexture", 1);
     }
 
     void resize() override
@@ -151,13 +155,22 @@ public:
     {
         gl::clear(ColorA::gray(0.5f));
 
+        if (mDepthW == 0) return;
+
         if (mDepthTexture)
         {
-            gl::ScopedGlslProg prog(mShader);
-            gl::ScopedTextureBind tex0(mDepthTexture);
+            gl::ScopedGlslProg prog(mDepthShader);
+            gl::ScopedTextureBind tex0(mDepthTexture, 0);
             gl::drawSolidRect(mLayout.canvases[0]);
         }
-        gl::draw(mColorTexture, mLayout.canvases[1]);
+
+        if (mColorTexture && mDepthToColorTableTexture)
+        {
+            gl::ScopedGlslProg prog(mColorShader);
+            gl::ScopedTextureBind tex0(mColorTexture, 0);
+            gl::ScopedTextureBind tex1(mDepthToColorTableTexture, 1);
+            gl::drawSolidRect(mLayout.canvases[1]);
+        }
 
         int canvasIds[] = { 0, 1 };
         for (int i : canvasIds)
@@ -175,7 +188,7 @@ public:
                 if (idx == selectedItem)
                     gl::color(ColorA(1, 0, 0, 0.5f));
 
-                gl::drawStrokedRoundedRect(item.getRectfInColor(), 5.0f);
+                gl::drawStrokedRoundedRect(item.getRect(), 5.0f);
                 //gl::drawStringCentered(item.name, vec2(item.pos), ColorA::white());
 
                 idx++;
@@ -223,28 +236,19 @@ public:
             ui::ScopedMainMenuBar menuBar;
 
             // add a file menu
-            if (ui::BeginMenu("File")){
+            if (ui::BeginMenu("File"))
+            {
                 ui::MenuItem("Open");
                 ui::MenuItem("Save");
                 ui::MenuItem("Save As");
                 ui::EndMenu();
             }
-
-            // and a view menu
-            if (ui::BeginMenu("View")){
-                ui::MenuItem("TestWindow", nullptr, &showTestWindow);
-                ui::EndMenu();
-            }
-        }
-
-        if (showTestWindow)
-        {
-            // have a look at this function for more examples
-            ui::ShowTestWindow();
         }
 
         {
             ui::ScopedWindow window("Items");
+            //if (mDepthToColorTableTexture) ui::Image(mDepthToColorTableTexture, mDepthToColorTableTexture->getSize());
+
             if (ui::Button("Add"))
             {
                 static int objCount = mItems.size();
@@ -253,7 +257,7 @@ public:
                 item.pos = { 100, 100 };
                 item.size = { 50, 50 };
                 item.name = "item" + to_string(objCount++);
-                item.grab(mDevice->depthChannel, mDevice->colorSurface);
+                item.update(mDevice->depthChannel, mDevice->colorSurface);
 
                 mItems.emplace_back(item);
             }
@@ -306,13 +310,15 @@ public:
             ui::ScopedWindow window("Item");
             MonitorItem& item = mItems[selectedItem];
             ui::InputText("name", &item.name);
-            if (ui::Button("grab"))
-            {
-                item.grab(mDevice->depthChannel, mDevice->colorSurface);
-            }
 
-            ui::DragInt2("pos", &item.pos.x);
-            ui::DragInt2("size", &item.size.x);
+            if (ui::DragInt2("pos", &item.pos.x))
+            {
+                item.update(mDevice->depthChannel, mDevice->colorSurface);
+            }
+            if (ui::DragInt2("size", &item.size.x))
+            {
+                item.update(mDevice->depthChannel, mDevice->colorSurface);
+            }
 
             if (item.colorTex && item.depthTex)
             {
@@ -330,14 +336,14 @@ public:
     }
 
 private:
-
-    void updateColorRelated()
-    {
-        updateTexture(mColorTexture, mDevice->colorSurface);
-    }
-        
+       
     void updateDepthRelated()
     {
+        if (mDepthW == 0)
+        {
+            mDepthW = mDevice->getColorSize().x;
+            mDepthH = mDevice->getColorSize().y;
+        }
         updateTexture(mDepthTexture, mDevice->depthChannel);
 
         float depthToMmScale = mDevice->getDepthToMmScale();
@@ -384,14 +390,13 @@ private:
     } mLayout;
 
     ds::DeviceRef mDevice;
-    signals::Connection mDirtyConnection;
-    int mDepthW, mDepthH;
-    int mColorW, mColorH;
+    int mDepthW = 0, mDepthH = 0;
 
     gl::TextureRef mDepthTexture;
     gl::TextureRef mColorTexture;
+    gl::TextureRef mDepthToColorTableTexture;
 
-    gl::GlslProgRef	mShader;
+    gl::GlslProgRef	mDepthShader, mColorShader;
 };
 
 CINDER_APP(KinServerApp, RendererGl)
