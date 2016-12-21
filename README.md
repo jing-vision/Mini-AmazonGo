@@ -1,7 +1,7 @@
 SmartMonitor
 =========
 
-Multi touch system for Kinect V1 & V2, Intel RealSense devices and OpenNI-compatible sensors.
+Mini Amazon-Go system, check [Cinder-DepthSensor](https://github.com/vnm-interactive/Cinder-DepthSensor) for supported sensors.
 
 To build this project, you need:
 
