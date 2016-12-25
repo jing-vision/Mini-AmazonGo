@@ -29,6 +29,65 @@ struct MonitorItem
     Channel16u depthChannel;
     Surface colorSurface;
     Channel8u processChannel;
+    int itemUsedCount = 0;
+    bool isItemUsing = false;
+
+    void updateItemUsing(bool flag)
+    {
+        if (isItemUsing)
+        {
+
+        }
+        else
+        {
+            if (flag) itemUsedCount++;
+        }
+
+        isItemUsing = flag;
+    }
+
+    JsonTree write()
+    {
+        auto depthPath = getAssetPath("") / "items" / (name + "_depth.png");
+        auto colorPath = getAssetPath("") / "items" / (name + "_color.png");
+        if (depthChannel.getWidth() > 0)
+        {
+            writeImage(depthPath, depthChannel);
+            writeImage(colorPath, colorSurface);
+        }
+
+        JsonTree tree;
+        tree.addChild(JsonTree("name", name));
+        tree.addChild(JsonTree("depthPath", depthPath.string()));
+        tree.addChild(JsonTree("colorPath", colorPath.string()));
+        tree.addChild(JsonTree("pos_x", pos.x));
+        tree.addChild(JsonTree("pos_y", pos.y));
+        tree.addChild(JsonTree("size_x", size.x));
+        tree.addChild(JsonTree("size_y", size.y));
+        tree.addChild(JsonTree("itemUsedCount", itemUsedCount));
+
+        return tree;
+    }
+
+    bool read(const JsonTree& tree)
+    {
+        name = tree.getValueForKey("name");
+        string depthPath = tree.getValueForKey("depthPath");
+        string colorPath = tree.getValueForKey("colorPath");
+        pos.x = tree.getValueForKey<float>("pos_x");
+        pos.y = tree.getValueForKey<float>("pos_y");
+        size.x = tree.getValueForKey<float>("size_x");
+        size.y = tree.getValueForKey<float>("size_y");
+        itemUsedCount = tree.getValueForKey<int>("itemUsedCount");
+
+        depthChannel = am::channel16u(depthPath)->clone();
+        colorSurface = am::surface(colorPath)->clone();
+        processChannel = { depthChannel.getWidth(), depthChannel.getHeight() };
+
+        _createTex();
+
+        return true;
+    }
 
     Rectf getRect() const
     {
@@ -48,6 +107,7 @@ struct MonitorItem
         rect.y1 *= yScale;
         rect.y2 *= yScale;
         colorSurface = color.clone(Area(rect), true);
+
         _createTex();
     }
 
@@ -56,24 +116,6 @@ struct MonitorItem
         updateTexture(depthTex, depthChannel);
         updateTexture(colorTex, colorSurface);
         updateTexture(processTex, processChannel);
-    }
-
-    void load()
-    {
-        depthChannel = *am::channel16u(name + "_depth.png");
-        colorSurface = *am::surface(name + "_color.png");
-        processChannel = { depthChannel.getWidth(), depthChannel.getHeight() };
-
-        _createTex();
-    }
-
-    void save()
-    {
-        if (depthChannel.getWidth() > 0)
-        {
-            writeImage(getAssetPath("") / (name + "_depth.png"), depthChannel);
-            writeImage(getAssetPath("") / (name + "_color.png"), colorSurface);
-        }
     }
 };
 
@@ -117,7 +159,8 @@ public:
             updateTexture(mDepthToColorTableTexture, mDevice->depthToColorTable, format);
         });
 
-        getWindow()->setSize(1024, 768);
+        getWindow()->setSize(_WINDOW_WIDTH, _WINDOW_HEIGHT);
+        getWindow()->setPos(100, 100);
         getWindow()->setTitle("SmartMonitor");
         
         gl::disableAlphaBlending();
@@ -127,6 +170,13 @@ public:
         mColorShader = am::glslProg("depthMap.vs", "colorMap.fs");
         mColorShader->uniform("uColorTexture", 0);
         mColorShader->uniform("uDepthToColorTableTexture", 1);
+
+        onLoadItems();
+    }
+
+    void shutdown()
+    {
+        onSaveItems();
     }
 
     void resize() override
@@ -135,7 +185,7 @@ public:
         mLayout.height = getWindowHeight();
         mLayout.halfW = mLayout.width / 2;
         mLayout.halfH = mLayout.height / 2;
-        mLayout.spc = mLayout.width * 0.04;
+        mLayout.spc = mLayout.width * 0.01;
 
         for (int x = 0; x < 2; x++)
         {
@@ -157,11 +207,13 @@ public:
 
         if (mDepthW == 0) return;
 
+        int canvasIds[] = { 0, 2 };
+
         if (mDepthTexture)
         {
             gl::ScopedGlslProg prog(mDepthShader);
             gl::ScopedTextureBind tex0(mDepthTexture, 0);
-            gl::drawSolidRect(mLayout.canvases[0]);
+            gl::drawSolidRect(mLayout.canvases[canvasIds[0]]);
         }
 
         if (mColorTexture && mDepthToColorTableTexture)
@@ -169,10 +221,10 @@ public:
             gl::ScopedGlslProg prog(mColorShader);
             gl::ScopedTextureBind tex0(mColorTexture, 0);
             gl::ScopedTextureBind tex1(mDepthToColorTableTexture, 1);
-            gl::drawSolidRect(mLayout.canvases[1]);
+            gl::drawSolidRect(mLayout.canvases[canvasIds[1]]);
         }
 
-        int canvasIds[] = { 0, 1 };
+        gl::ScopedColor scopedColor;
         for (int i : canvasIds)
         {
             vec2 scale;
@@ -186,14 +238,15 @@ public:
             for (auto& item : mItems)
             {
                 if (idx == selectedItem)
-                    gl::color(ColorA(1, 0, 0, 0.5f));
+                    gl::color(ColorA(1, 0, 0, 1));
+                else
+                    gl::color(ColorA(0, 1, 0, 1));
 
                 gl::drawStrokedRoundedRect(item.getRect(), 5.0f);
                 //gl::drawStringCentered(item.name, vec2(item.pos), ColorA::white());
 
                 idx++;
 
-                gl::color(ColorA::white());
             }
         }
     }
@@ -207,24 +260,34 @@ public:
         }
     }
 
-    void _load()
+    void onLoadItems()
     {
-        auto content = am::str("items.txt");
-        if (content.empty()) return;
+        auto filename = getAssetPath("items.json");
+        if (!fs::exists(filename)) return;
 
         mItems.clear();
 
-        auto itemNames = split(content, ',');
-        for (auto& name : itemNames)
+        auto itemsJson = JsonTree(loadFile(filename));
+        for (const auto& itemJson : itemsJson)
         {
-            if (name.empty()) continue;
-
             MonitorItem item;
-            item.name = name;
-            item.load();
+            if (!item.read(itemJson)) continue;
 
             mItems.emplace_back(item);
         }
+    }
+
+    void onSaveItems()
+    {
+        if (mItems.empty()) return;
+
+        JsonTree itemsJson;
+        for (auto& item : mItems)
+        {
+            auto itemJson = item.write();
+            itemsJson.addChild(itemJson);
+        }
+        itemsJson.write(getAssetPath("") / "items.json");
     }
 
     void update() override
@@ -232,6 +295,7 @@ public:
         mFps = getAverageFps();
 
         // create the main menu bar
+        if (false)
         {
             ui::ScopedMainMenuBar menuBar;
 
@@ -245,13 +309,14 @@ public:
             }
         }
 
-        {
-            ui::ScopedWindow window("Items");
-            //if (mDepthToColorTableTexture) ui::Image(mDepthToColorTableTexture, mDepthToColorTableTexture->getSize());
+        [&] {
+            ui::ScopedWindow window("Config");
+            ui::NewLine();
+            if (!ui::CollapsingHeader("Items", ImGuiTreeNodeFlags_DefaultOpen)) return;
 
             if (ui::Button("Add"))
             {
-                static int objCount = mItems.size();
+                static int objCount = 0;
 
                 MonitorItem item;
                 item.pos = { 100, 100 };
@@ -271,24 +336,15 @@ public:
                 }
             }
 
-            if (ui::Button("Load"))
+            if (ui::Button("Reload"))
             {
-                _load();
+                onLoadItems();
             }
 
             ui::SameLine();
             if (ui::Button("Save"))
             {
-                string filename = (getAssetPath("") / "items.json").string();
-                ofstream ofs(filename);
-                if (ofs)
-                {
-                    for (auto& item : mItems)
-                    {
-                        ofs << item.name << ",";
-                        item.save();
-                    }
-                }
+                onSaveItems();
             }
 
             // selectable list
@@ -303,26 +359,33 @@ public:
                 idx++;
             }
             ui::ListBoxFooter();
-        }
+        }();
 
         if (selectedItem != -1)
         {
             ui::ScopedWindow window("Item");
             MonitorItem& item = mItems[selectedItem];
             ui::InputText("name", &item.name);
+            ui::Text(item.isItemUsing ? "being used" : "still there");
+            ui::Text("used count: %d", item.itemUsedCount);
 
-            if (ui::DragInt2("pos", &item.pos.x))
+            bool posXChanged = ui::DragInt("x", &item.pos.x, 1, 0, mDepthW - item.size.x - 1);
+            bool posYChanged = ui::DragInt("y", &item.pos.y, 1, 0, mDepthH - item.size.y - 1);
+            if (posXChanged || posYChanged)
             {
                 item.update(mDevice->depthChannel, mDevice->colorSurface);
             }
-            if (ui::DragInt2("size", &item.size.x))
+
+            bool sizeXChanged = ui::DragInt("width", &item.size.x, 1, 0, mDepthW - item.pos.x - 1);
+            bool sizeYChanged = ui::DragInt("height", &item.size.y, 1, 0, mDepthH - item.pos.y - 1);
+            if (sizeXChanged || sizeYChanged)
             {
                 item.update(mDevice->depthChannel, mDevice->colorSurface);
             }
 
             if (item.colorTex && item.depthTex)
             {
-                auto size = item.colorTex->getSize();
+                auto size = item.depthTex->getSize();
                 ui::NewLine();
                 ui::Image(item.depthTex, size);
 
@@ -341,8 +404,8 @@ private:
     {
         if (mDepthW == 0)
         {
-            mDepthW = mDevice->getColorSize().x;
-            mDepthH = mDevice->getColorSize().y;
+            mDepthW = mDevice->getDepthSize().x;
+            mDepthH = mDevice->getDepthSize().y;
         }
         updateTexture(mDepthTexture, mDevice->depthChannel);
 
@@ -351,26 +414,28 @@ private:
 
         for (auto& item : mItems)
         {
+            int pixelCountThreshold = item.size.x * item.size.y * ITEM_USING_RATIO;
+            int count = 0;
             for (int j = 0; j < item.size.y; j++)
             {
                 int y = j;
                 for (int i = 0; i < item.size.x; i++)
                 {
-                    //int x = LEFT_RIGHT_FLIPPED ? (mDepthW - i) : i;
                     auto bg = *item.depthChannel.getData(i, j);
                     auto dep = *mDevice->depthChannel.getData(item.pos.x + i, item.pos.y + j);
                     auto diff = dep - bg;
                     if (dep > 0 && diff > minThresholdInDepthUnit)
                     {
                         *item.processChannel.getData(i, j) = 255;
+                        count++;
                     }
                     else
                     {
-                        // TODO: optimize
                         *item.processChannel.getData(i, j) = 0;
                     }
                 }
             }
+            item.updateItemUsing(count > pixelCountThreshold);
             updateTexture(item.processTex, item.processChannel);
         }
     }

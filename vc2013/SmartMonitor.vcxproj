@@ -168,7 +168,7 @@
       <AdditionalIncludeDirectories>"..\..\Cinder\include";..\include</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Link>
-      <AdditionalDependencies>Cinder-DepthSensor.lib;cinder-$(PlatformToolset).lib;%(AdditionalDependencies);</AdditionalDependencies>
+      <AdditionalDependencies>Cinder-DepthSensor.lib;cinder.lib;%(AdditionalDependencies);</AdditionalDependencies>
       <AdditionalLibraryDirectories>..\..\Cinder\blocks\Cinder-DepthSensor\lib\msw\$(PlatformTarget);..\..\Cinder\lib\msw\$(PlatformTarget);..\..\Cinder\lib\msw\$(PlatformTarget)\$(Configuration)\$(PlatformToolset)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <GenerateMapFile>true</GenerateMapFile>
@@ -204,7 +204,7 @@
       <AdditionalIncludeDirectories>"..\..\Cinder\include";..\include</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Link>
-      <AdditionalDependencies>Cinder-DepthSensor.lib;cinder-$(PlatformToolset).lib;%(AdditionalDependencies);</AdditionalDependencies>
+      <AdditionalDependencies>Cinder-DepthSensor.lib;cinder.lib;%(AdditionalDependencies);</AdditionalDependencies>
       <AdditionalLibraryDirectories>..\..\Cinder\blocks\Cinder-DepthSensor\lib\msw\$(PlatformTarget);..\..\Cinder\lib\msw\$(PlatformTarget);..\..\Cinder\lib\msw\$(PlatformTarget)\$(Configuration)\$(PlatformToolset)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <GenerateMapFile>true</GenerateMapFile>
@@ -228,13 +228,16 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Cinder\blocks\Cinder-ImGui\include\CinderImGui.h" />
+    <ClInclude Include="..\..\Cinder\blocks\Cinder-ImGui\lib\ImGuizmo\ImGuizmo.h" />
     <ClInclude Include="..\..\Cinder\blocks\Cinder-ImGui\lib\imgui\imgui.h" />
     <ClInclude Include="..\..\Cinder\blocks\Cinder-OpenCV3\include\CinderOpenCV.h" />
     <ClInclude Include="..\..\Cinder\blocks\Cinder-VNM\include\AssetManager.h" />
     <ClInclude Include="..\..\Cinder\blocks\Cinder-VNM\include\MiniConfig.h" />
+    <ClInclude Include="..\..\Cinder\blocks\Cinder-VNM\include\MiniConfigImgui.h" />
     <ClInclude Include="..\include\Resources.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\Cinder\blocks\Cinder-ImGui\lib\ImGuizmo\ImGuizmo.cpp" />
     <ClCompile Include="..\..\Cinder\blocks\Cinder-ImGui\lib\imgui\imgui.cpp" />
     <ClCompile Include="..\..\Cinder\blocks\Cinder-ImGui\lib\imgui\imgui_demo.cpp" />
     <ClCompile Include="..\..\Cinder\blocks\Cinder-ImGui\lib\imgui\imgui_draw.cpp" />
@@ -250,7 +253,9 @@
     <None Include="..\include\item.def" />
   </ItemGroup>
   <ItemGroup>
-    <Xml Include="..\assets\MiniConfig.xml" />
+    <Xml Include="..\assets\MiniConfig.xml">
+      <SubType>Designer</SubType>
+    </Xml>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
