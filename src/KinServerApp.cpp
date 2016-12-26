@@ -160,7 +160,7 @@ public:
         });
 
         getWindow()->setSize(_WINDOW_WIDTH, _WINDOW_HEIGHT);
-        getWindow()->setPos(100, 100);
+        getWindow()->setPos(_WINDOW_X, _WINDOW_Y);
         getWindow()->setTitle("SmartMonitor");
         
         gl::disableAlphaBlending();
