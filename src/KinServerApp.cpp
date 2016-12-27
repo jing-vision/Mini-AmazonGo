@@ -4,6 +4,7 @@
 #include "cinder/gl/scoped.h"
 #include "cinder/Log.h"
 #include "cinder/Json.h"
+#include "cinder/Utilities.h"
 
 #include <vector>
 
@@ -11,6 +12,7 @@
 #include "Cinder-VNM/include/MiniConfigImgui.h"
 #include "Cinder-VNM/include/AssetManager.h"
 #include "Cinder-VNM/include/TextureHelper.h"
+#include "Cinder-VNM/include/FontHelper.h"
 
 #include "CinderImGui.h"
 
@@ -126,6 +128,8 @@ public:
     vector<MonitorItem>	mItems;
     int selectedItem = -1;
 
+    gl::TextureFontRef mFont;
+
     void setup() override
     {
         const auto& args = getCommandLineArgs();
@@ -172,6 +176,8 @@ public:
         mColorShader->uniform("uDepthToColorTableTexture", 1);
 
         onLoadItems();
+
+        mFont = FontHelper::createTextureFont("Times New Roman", 24);
     }
 
     void shutdown()
@@ -244,9 +250,9 @@ public:
 
                 gl::drawStrokedRoundedRect(item.getRect(), 5.0f);
                 //gl::drawStringCentered(item.name, vec2(item.pos), ColorA::white());
+                mFont->drawString(item.name + " - " + toString(item.itemUsedCount), { item.pos.x, item.pos.y - 5 });
 
                 idx++;
-
             }
         }
     }
@@ -267,27 +273,41 @@ public:
 
         mItems.clear();
 
-        auto itemsJson = JsonTree(loadFile(filename));
-        for (const auto& itemJson : itemsJson)
+        JsonTree itemsJson;
+        try
         {
-            MonitorItem item;
-            if (!item.read(itemJson)) continue;
+            itemsJson = JsonTree(loadFile(filename));
+            for (const auto& itemJson : itemsJson)
+            {
+                MonitorItem item;
+                if (!item.read(itemJson)) continue;
 
-            mItems.emplace_back(item);
+                mItems.emplace_back(item);
+            }
+        }
+        catch (JsonTree::Exception& e)
+        {
+            CI_LOG_EXCEPTION("Loading Json", e);
         }
     }
 
     void onSaveItems()
     {
-        if (mItems.empty()) return;
-
-        JsonTree itemsJson;
-        for (auto& item : mItems)
+        auto itemsJsonPath = getAssetPath("") / "items.json";
+        if (!mItems.empty())
         {
-            auto itemJson = item.write();
-            itemsJson.addChild(itemJson);
+            JsonTree itemsJson;
+            for (auto& item : mItems)
+            {
+                auto itemJson = item.write();
+                itemsJson.addChild(itemJson);
+            }
+            itemsJson.write(itemsJsonPath);
         }
-        itemsJson.write(getAssetPath("") / "items.json");
+        else
+        {
+            writeString(itemsJsonPath, "{}");
+        }
     }
 
     void update() override
@@ -367,18 +387,13 @@ public:
             MonitorItem& item = mItems[selectedItem];
             ui::InputText("name", &item.name);
             ui::Text(item.isItemUsing ? "being used" : "still there");
-            ui::Text("used count: %d", item.itemUsedCount);
+            ui::DragInt("used count", &item.itemUsedCount);
 
             bool posXChanged = ui::DragInt("x", &item.pos.x, 1, 0, mDepthW - item.size.x - 1);
             bool posYChanged = ui::DragInt("y", &item.pos.y, 1, 0, mDepthH - item.size.y - 1);
-            if (posXChanged || posYChanged)
-            {
-                item.update(mDevice->depthChannel, mDevice->colorSurface);
-            }
-
             bool sizeXChanged = ui::DragInt("width", &item.size.x, 1, 0, mDepthW - item.pos.x - 1);
             bool sizeYChanged = ui::DragInt("height", &item.size.y, 1, 0, mDepthH - item.pos.y - 1);
-            if (sizeXChanged || sizeYChanged)
+            if (posXChanged || posYChanged || sizeXChanged || sizeYChanged)
             {
                 item.update(mDevice->depthChannel, mDevice->colorSurface);
             }

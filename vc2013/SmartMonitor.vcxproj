@@ -232,6 +232,7 @@
     <ClInclude Include="..\..\Cinder\blocks\Cinder-ImGui\lib\imgui\imgui.h" />
     <ClInclude Include="..\..\Cinder\blocks\Cinder-OpenCV3\include\CinderOpenCV.h" />
     <ClInclude Include="..\..\Cinder\blocks\Cinder-VNM\include\AssetManager.h" />
+    <ClInclude Include="..\..\Cinder\blocks\Cinder-VNM\include\FontHelper.h" />
     <ClInclude Include="..\..\Cinder\blocks\Cinder-VNM\include\MiniConfig.h" />
     <ClInclude Include="..\..\Cinder\blocks\Cinder-VNM\include\MiniConfigImgui.h" />
     <ClInclude Include="..\include\Resources.h" />
