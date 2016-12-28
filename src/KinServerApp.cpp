@@ -20,6 +20,8 @@ using namespace ci;
 using namespace ci::app;
 using namespace std;
 
+static auto depthTexFormat = gl::Texture::Format().dataType(GL_UNSIGNED_SHORT).internalFormat(GL_R16UI).immutableStorage();
+
 struct MonitorItem
 {
     string	name;
@@ -50,7 +52,7 @@ struct MonitorItem
 
     JsonTree write()
     {
-        auto depthPath = getAssetPath("") / "items" / (name + "_depth.png");
+        auto depthPath = getAssetPath("") / "items" / (name + "_depth.hdr");
         auto colorPath = getAssetPath("") / "items" / (name + "_color.png");
         if (depthChannel.getWidth() > 0)
         {
@@ -115,7 +117,7 @@ struct MonitorItem
 
     void _createTex()
     {
-        updateTexture(depthTex, depthChannel);
+        updateTexture(depthTex, depthChannel, depthTexFormat);
         updateTexture(colorTex, colorSurface);
         updateTexture(processTex, processChannel);
     }
@@ -166,7 +168,7 @@ public:
         getWindow()->setSize(_WINDOW_WIDTH, _WINDOW_HEIGHT);
         getWindow()->setPos(_WINDOW_X, _WINDOW_Y);
         getWindow()->setTitle("SmartMonitor");
-        
+
         gl::disableAlphaBlending();
 
         mDepthShader = am::glslProg("depthMap.vs", "depthMap.fs");
@@ -389,10 +391,10 @@ public:
             ui::Text(item.isItemUsing ? "being used" : "still there");
             ui::DragInt("used count", &item.itemUsedCount);
 
-            bool posXChanged = ui::DragInt("x", &item.pos.x, 1, 0, mDepthW - item.size.x - 1);
-            bool posYChanged = ui::DragInt("y", &item.pos.y, 1, 0, mDepthH - item.size.y - 1);
-            bool sizeXChanged = ui::DragInt("width", &item.size.x, 1, 0, mDepthW - item.pos.x - 1);
-            bool sizeYChanged = ui::DragInt("height", &item.size.y, 1, 0, mDepthH - item.pos.y - 1);
+            bool posXChanged = ui::DragInt("x", &item.pos.x, 1, 0, mDepthW - item.size.x);
+            bool posYChanged = ui::DragInt("y", &item.pos.y, 1, 0, mDepthH - item.size.y);
+            bool sizeXChanged = ui::DragInt("width", &item.size.x, 1, 0, mDepthW - item.pos.x);
+            bool sizeYChanged = ui::DragInt("height", &item.size.y, 1, 0, mDepthH - item.pos.y);
             if (posXChanged || posYChanged || sizeXChanged || sizeYChanged)
             {
                 item.update(mDevice->depthChannel, mDevice->colorSurface);
@@ -414,7 +416,7 @@ public:
     }
 
 private:
-       
+
     void updateDepthRelated()
     {
         if (mDepthW == 0)
@@ -422,7 +424,7 @@ private:
             mDepthW = mDevice->getDepthSize().x;
             mDepthH = mDevice->getDepthSize().y;
         }
-        updateTexture(mDepthTexture, mDevice->depthChannel);
+        updateTexture(mDepthTexture, mDevice->depthChannel, depthTexFormat);
 
         float depthToMmScale = mDevice->getDepthToMmScale();
         float minThresholdInDepthUnit = ITEM_HEIGHT_MM / depthToMmScale;
