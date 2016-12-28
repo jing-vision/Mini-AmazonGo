@@ -316,6 +316,11 @@ public:
     {
         mFps = getAverageFps();
 
+        mDepthShader->uniform("uFlipX", FLIP_X);
+        mDepthShader->uniform("uFlipY", FLIP_Y);
+        mColorShader->uniform("uFlipX", FLIP_X);
+        mColorShader->uniform("uFlipY", FLIP_Y);
+
         // create the main menu bar
         if (false)
         {
@@ -443,7 +448,7 @@ private:
                     auto diff = dep - bg;
                     if (dep > 0 && diff > minThresholdInDepthUnit)
                     {
-                        *item.processChannel.getData(i, j) = 255;
+                        *item.processChannel.getData(i, j) = diff & 0xff;
                         count++;
                     }
                     else
