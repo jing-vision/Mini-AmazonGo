@@ -148,8 +148,6 @@ public:
         mDevice = ds::Device::create(type, option);
         if (!mDevice->isValid())
         {
-            quit();
-            return;
         }
 
         mDevice->signalColorDirty.connect([&] {
@@ -211,7 +209,7 @@ public:
 
     void draw() override
     {
-        gl::clear(ColorA::gray(0.5f));
+        gl::clear(ColorA::gray(0.3f));
 
         if (mDepthW == 0) return;
 
