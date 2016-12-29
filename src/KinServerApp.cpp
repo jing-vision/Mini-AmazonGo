@@ -314,8 +314,13 @@ public:
     {
         mFps = getAverageFps();
 
+        if (MIN_DEPTH_FOR_VIZ_MM > MAX_DEPTH_FOR_VIZ_MM) MIN_DEPTH_FOR_VIZ_MM = MAX_DEPTH_FOR_VIZ_MM;
+
         mDepthShader->uniform("uFlipX", FLIP_X);
         mDepthShader->uniform("uFlipY", FLIP_Y);
+        mDepthShader->uniform("uMinDepthForVizMM", MIN_DEPTH_FOR_VIZ_MM);
+        mDepthShader->uniform("uMaxDepthForVizMM", MAX_DEPTH_FOR_VIZ_MM);
+
         mColorShader->uniform("uFlipX", FLIP_X);
         mColorShader->uniform("uFlipY", FLIP_Y);
 

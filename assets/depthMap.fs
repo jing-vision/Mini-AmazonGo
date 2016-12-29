@@ -1,6 +1,8 @@
 #version 150
 
 uniform usampler2D uDepthTexture;
+uniform float uMinDepthForVizMM;
+uniform float uMaxDepthForVizMM;
 
 in vec2 TexCoord;
 
@@ -10,7 +12,8 @@ void main(void)
 { 
 #if 1
     float d = texture(uDepthTexture, TexCoord).r;
-    oColor = vec4(d / 4000.0);
+    d = (d - uMinDepthForVizMM) / uMaxDepthForVizMM;
+    oColor = vec4(d);
 #else
     int d = int(texture(uDepthTexture, TexCoord).r);
     int r = ((d>>8)&0xff)<<2;
