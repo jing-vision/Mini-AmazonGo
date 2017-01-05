@@ -20,8 +20,6 @@ using namespace ci;
 using namespace ci::app;
 using namespace std;
 
-static auto depthTexFormat = gl::Texture::Format().dataType(GL_UNSIGNED_SHORT).internalFormat(GL_R16UI).immutableStorage();
-
 struct MonitorItem
 {
     string	name;
@@ -36,18 +34,20 @@ struct MonitorItem
     int itemUsedCount = 0;
     bool isItemUsing = false;
 
-    void updateItemUsing(bool flag)
+    void updateItemUsing(bool changeState)
     {
         if (isItemUsing)
         {
-
+            if (changeState) isItemUsing = false;
         }
         else
         {
-            if (flag) itemUsedCount++;
+            if (changeState)
+            {
+                isItemUsing = true;
+                itemUsedCount++;
+            }
         }
-
-        isItemUsing = flag;
     }
 
     JsonTree write()
@@ -117,7 +117,7 @@ struct MonitorItem
 
     void _createTex()
     {
-        updateTexture(depthTex, depthChannel, depthTexFormat);
+        updateTexture(depthTex, depthChannel, getTextureFormatUINT16());
         updateTexture(colorTex, colorSurface);
         updateTexture(processTex, processChannel);
     }
@@ -135,9 +135,11 @@ public:
     void setup() override
     {
         const auto& args = getCommandLineArgs();
-        readConfig();
         log::makeLogger<log::LoggerFile>();
 
+        mFont = FontHelper::createTextureFont();
+
+        readConfig();
         createConfigImgui();
 
         ds::DeviceType type = ds::DeviceType(_SENSOR_TYPE);
@@ -167,7 +169,8 @@ public:
         getWindow()->setPos(_WINDOW_X, _WINDOW_Y);
         getWindow()->setTitle("SmartMonitor");
 
-        gl::disableAlphaBlending();
+        gl::enableAlphaBlending();
+        gl::disableDepthRead();
 
         mDepthShader = am::glslProg("depthMap.vs", "depthMap.fs");
         mDepthShader->uniform("uDepthTexture", 0);
@@ -176,13 +179,12 @@ public:
         mColorShader->uniform("uDepthToColorTableTexture", 1);
 
         onLoadItems();
-
-        mFont = FontHelper::createTextureFont("Times New Roman", 24);
     }
 
-    void shutdown()
+    void cleanup()
     {
-        onSaveItems();
+        //onSaveItems();
+        //writeConfig();
     }
 
     void resize() override
@@ -205,6 +207,10 @@ public:
                     );
             }
         }
+
+        // HACK
+        mLayout.canvases[0].offset({ DEPTH_ROI_X1 * getWindowWidth(), DEPTH_ROI_Y1 * getWindowHeight() });
+        mLayout.canvases[2].offset({ DEPTH_ROI_X2 * getWindowWidth(), DEPTH_ROI_Y2 * getWindowHeight() });
     }
 
     void draw() override
@@ -213,21 +219,23 @@ public:
 
         if (mDepthW == 0) return;
 
-        int canvasIds[] = { 0, 2 };
-
-        if (mDepthTexture)
-        {
-            gl::ScopedGlslProg prog(mDepthShader);
-            gl::ScopedTextureBind tex0(mDepthTexture, 0);
-            gl::drawSolidRect(mLayout.canvases[canvasIds[0]]);
-        }
+        int canvasIds[] = { 2, 0 };
 
         if (mColorTexture && mDepthToColorTableTexture)
         {
             gl::ScopedGlslProg prog(mColorShader);
             gl::ScopedTextureBind tex0(mColorTexture, 0);
             gl::ScopedTextureBind tex1(mDepthToColorTableTexture, 1);
+            gl::drawSolidRect(mLayout.canvases[canvasIds[0]]);
+            //gl::drawSolidRect(mLayout.canvases[canvasIds[1]], { DEPTH_ROI_X1, DEPTH_ROI_Y1 }, { DEPTH_ROI_X2, DEPTH_ROI_Y2 });
+        }
+
+        if (mDepthTexture)
+        {
+            gl::ScopedGlslProg prog(mDepthShader);
+            gl::ScopedTextureBind tex0(mDepthTexture, 0);
             gl::drawSolidRect(mLayout.canvases[canvasIds[1]]);
+            //gl::drawSolidRect(mLayout.canvases[canvasIds[0]], { DEPTH_ROI_X1, DEPTH_ROI_Y1 }, { DEPTH_ROI_X2, DEPTH_ROI_Y2 });
         }
 
         gl::ScopedColor scopedColor;
@@ -243,15 +251,24 @@ public:
             int idx = 0;
             for (auto& item : mItems)
             {
-                if (idx == selectedItem)
-                    gl::color(ColorA(1, 0, 0, 1));
+                if (DEMO_MODE)
+                {
+                    if (i == 0)
+                    {
+                        gl::color(ColorA(1, 0, 0, 1));
+                        mFont->drawString(toString(item.itemUsedCount), { item.pos.x, item.pos.y});
+                    }
+                }
                 else
-                    gl::color(ColorA(0, 1, 0, 1));
+                {
+                    if (idx == selectedItem)
+                        gl::color(ColorA(1, 0, 0, 1));
+                    else
+                        gl::color(ColorA(0, 0, 0, 1));
 
-                gl::drawStrokedRoundedRect(item.getRect(), 5.0f);
-                //gl::drawStringCentered(item.name, vec2(item.pos), ColorA::white());
-                mFont->drawString(item.name + " - " + toString(item.itemUsedCount), { item.pos.x, item.pos.y - 5 });
-
+                    gl::drawStrokedRoundedRect(item.getRect(), 5.0f);
+                    mFont->drawString(i == 0 ? item.name : toString(item.itemUsedCount), { item.pos.x, item.pos.y - 5 });
+                }
                 idx++;
             }
         }
@@ -350,7 +367,7 @@ public:
 
                 MonitorItem item;
                 item.pos = { 100, 100 };
-                item.size = { 50, 50 };
+                item.size = { 10, 10 };
                 item.name = "item" + to_string(objCount++);
                 item.update(mDevice->depthChannel, mDevice->colorSurface);
 
@@ -376,6 +393,17 @@ public:
             {
                 onSaveItems();
             }
+
+            if (ui::Button("Refresh all"))
+            {
+                for (auto& item : mItems)
+                {
+                    item.update(mDevice->depthChannel, mDevice->colorSurface);
+                    item.itemUsedCount = 0;
+                    item.isItemUsing = false;
+                }
+            }
+
 
             // selectable list
             ui::ListBoxHeader("");
@@ -432,14 +460,20 @@ private:
             mDepthW = mDevice->getDepthSize().x;
             mDepthH = mDevice->getDepthSize().y;
         }
-        updateTexture(mDepthTexture, mDevice->depthChannel, depthTexFormat);
+        updateTexture(mDepthTexture, mDevice->depthChannel, getTextureFormatUINT16());
 
         float depthToMmScale = mDevice->getDepthToMmScale();
         float minThresholdInDepthUnit = ITEM_HEIGHT_MM / depthToMmScale;
+        float minThresholdBackInDepthUnit = ITEM_RETURN_ABSOLUTE_HEIGHT_MM / depthToMmScale;
 
         for (auto& item : mItems)
         {
-            int pixelCountThreshold = item.size.x * item.size.y * ITEM_USING_RATIO;
+            int pixelCountThreshold = 0;
+            if (item.isItemUsing)
+                pixelCountThreshold = item.size.x * item.size.y * ITEM_USING_RATIO;
+            else
+                pixelCountThreshold = item.size.x * item.size.y * ITEM_RETURN_RATIO;
+
             int count = 0;
             for (int j = 0; j < item.size.y; j++)
             {
@@ -448,15 +482,34 @@ private:
                 {
                     auto bg = *item.depthChannel.getData(i, j);
                     auto dep = *mDevice->depthChannel.getData(item.pos.x + i, item.pos.y + j);
-                    auto diff = dep - bg;
-                    if (dep > 0 && diff > minThresholdInDepthUnit)
+
+                    // TODO: refactor
+                    if (item.isItemUsing)
                     {
-                        *item.processChannel.getData(i, j) = diff & 0xff;
-                        count++;
+                        auto diff = abs(dep - bg);
+                        if (dep > 0 && diff < minThresholdBackInDepthUnit)
+                        {
+                            *item.processChannel.getData(i, j) = diff & 0xff;
+                            count++;
+                        }
+                        else
+                        {
+                            *item.processChannel.getData(i, j) = 0;
+                        }
                     }
                     else
                     {
-                        *item.processChannel.getData(i, j) = 0;
+                        auto diff = dep - bg;
+                        if (dep > 0 && diff > minThresholdInDepthUnit)
+                        {
+                            *item.processChannel.getData(i, j) = diff & 0xff;
+                            count++;
+                        }
+                        else
+                        {
+                            *item.processChannel.getData(i, j) = 0;
+                        }
+
                     }
                 }
             }

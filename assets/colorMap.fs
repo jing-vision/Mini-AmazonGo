@@ -10,6 +10,11 @@ out vec4 oColor;
 void main(void)
 { 
     vec2 uv = texture(uDepthToColorTableTexture, TexCoord).xy;
+    if (isinf(uv.x))
+    {
+        discard;
+    }
+
     uv.y = 1.0 - uv.y;
     oColor = texture(uColorTexture, uv);
 }
