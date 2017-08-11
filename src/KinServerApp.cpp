@@ -123,7 +123,7 @@ struct MonitorItem
     }
 };
 
-class KinServerApp : public App
+class AmazonGoApp : public App
 {
 public:
 
@@ -156,7 +156,7 @@ public:
             updateTexture(mColorTexture, mDevice->colorSurface);
         });
 
-        mDevice->signalDepthDirty.connect(std::bind(&KinServerApp::updateDepthRelated, this));
+        mDevice->signalDepthDirty.connect(std::bind(&AmazonGoApp::updateDepthRelated, this));
 
         mDevice->signalDepthToColorTableDirty.connect([&] {
             auto format = gl::Texture::Format()
@@ -542,4 +542,4 @@ private:
     gl::GlslProgRef	mDepthShader, mColorShader;
 };
 
-CINDER_APP(KinServerApp, RendererGl)
+CINDER_APP(AmazonGoApp, RendererGl)
