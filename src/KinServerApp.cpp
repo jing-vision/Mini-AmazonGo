@@ -4,6 +4,7 @@
 #include "cinder/gl/scoped.h"
 #include "cinder/Log.h"
 #include "cinder/Json.h"
+#include "cinder/Url.h"
 #include "cinder/Utilities.h"
 
 #include <vector>
@@ -34,17 +35,35 @@ struct MonitorItem
     int itemUsedCount = 0;
     bool isItemUsing = false;
 
+    void notifyHTTPStatus()
+    {
+        char urlName[256];
+        sprintf(urlName, "http://%s:%d/api/objectitem/%s/%s",
+            SERVER_ADDR.c_str(), SERVER_PORT,
+            isItemUsing ? "pickup" : "return",
+            name.c_str());
+        auto url = loadUrl(Url(urlName));
+        auto str = loadString(url);
+        CI_LOG_I(urlName);
+        CI_LOG_I(str);
+    }
+
     void updateItemUsing(bool changeState)
     {
         if (isItemUsing)
         {
-            if (changeState) isItemUsing = false;
+            if (changeState)
+            {
+                isItemUsing = false;
+                notifyHTTPStatus();
+            }
         }
         else
         {
             if (changeState)
             {
                 isItemUsing = true;
+                notifyHTTPStatus();
                 itemUsedCount++;
             }
         }

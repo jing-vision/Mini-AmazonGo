@@ -149,11 +149,6 @@
     <None Include="..\assets\depthMap.vs" />
     <None Include="..\include\item.def" />
   </ItemGroup>
-  <ItemGroup>
-    <Xml Include="..\assets\MiniConfig.xml">
-      <SubType>Designer</SubType>
-    </Xml>
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
 </Project>
