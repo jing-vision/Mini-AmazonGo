@@ -404,6 +404,7 @@
 				OTHER_LDFLAGS = (
 					"\"$(CINDER_PATH)/lib/macosx/$(CONFIGURATION)/libcinder.a\"",
 					"\"$(CINDER_PATH)/blocks/Cinder-DepthSensor/lib/macosx/libCinder-DepthSensor-d.a\"",
+					"/usr/local/lib/libusb-1.0.a",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.libcinder.AmazonGo;
 				PRODUCT_NAME = AmazonGo;
@@ -434,6 +435,7 @@
 				OTHER_LDFLAGS = (
 					"\"$(CINDER_PATH)/lib/macosx/$(CONFIGURATION)/libcinder.a\"",
 					"\"$(CINDER_PATH)/blocks/Cinder-DepthSensor/lib/macosx/libCinder-DepthSensor.a\"",
+					"/usr/local/lib/libusb-1.0.a",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.libcinder.AmazonGo;
 				PRODUCT_NAME = AmazonGo;
