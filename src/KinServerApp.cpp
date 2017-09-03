@@ -153,6 +153,9 @@ public:
 
     void setup() override
     {
+        CI_LOG_V(gl::getVendorString());
+        CI_LOG_V(gl::getVersionString());
+        
         const auto& args = getCommandLineArgs();
         log::makeLogger<log::LoggerFile>();
 
@@ -169,6 +172,8 @@ public:
         mDevice = ds::Device::create(type, option);
         if (!mDevice->isValid())
         {
+            CI_LOG_F("Faile to create depth sensor: " << type);
+            quit();
         }
 
         mDevice->signalColorDirty.connect([&] {
@@ -482,6 +487,7 @@ private:
             mDepthH = mDevice->getDepthSize().y;
         }
         updateTexture(mDepthTexture, mDevice->depthChannel, getTextureFormatUINT16());
+        gl::checkError();
 
         float depthToMmScale = mDevice->getDepthToMmScale();
         float minThresholdInDepthUnit = ITEM_HEIGHT_MM / depthToMmScale;
