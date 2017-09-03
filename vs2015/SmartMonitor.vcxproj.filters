@@ -25,6 +25,9 @@
     <Filter Include="Blocks\imgui\lib">
       <UniqueIdentifier>{70a5dd82-5d4a-49d8-b419-91bc3a63bdc5}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Blocks\opencv-rgbd">
+      <UniqueIdentifier>{70c25873-7fce-444d-8c72-5d2bbdbe0997}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\KinServerApp.cpp">
@@ -53,6 +56,30 @@
     </ClCompile>
     <ClCompile Include="..\..\Cinder\blocks\Cinder-ImGui\lib\ImGuizmo\ImGuizmo.cpp">
       <Filter>Blocks\imgui\lib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\opencv-rgbd\src\depth_cleaner.cpp">
+      <Filter>Blocks\opencv-rgbd</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\opencv-rgbd\src\depth_registration.cpp">
+      <Filter>Blocks\opencv-rgbd</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\opencv-rgbd\src\depth_to_3d.cpp">
+      <Filter>Blocks\opencv-rgbd</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\opencv-rgbd\src\linemod.cpp">
+      <Filter>Blocks\opencv-rgbd</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\opencv-rgbd\src\normal.cpp">
+      <Filter>Blocks\opencv-rgbd</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\opencv-rgbd\src\odometry.cpp">
+      <Filter>Blocks\opencv-rgbd</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\opencv-rgbd\src\plane.cpp">
+      <Filter>Blocks\opencv-rgbd</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\opencv-rgbd\src\utils.cpp">
+      <Filter>Blocks\opencv-rgbd</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -85,6 +112,21 @@
     </ClInclude>
     <ClInclude Include="..\..\Cinder\blocks\Cinder-VNM\include\FontHelper.h">
       <Filter>Blocks\VNM</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\opencv-rgbd\include\opencv2\rgbd\linemod.hpp">
+      <Filter>Blocks\opencv-rgbd</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\opencv-rgbd\include\opencv2\rgbd.hpp">
+      <Filter>Blocks\opencv-rgbd</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\opencv-rgbd\src\depth_to_3d.h">
+      <Filter>Blocks\opencv-rgbd</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\opencv-rgbd\src\precomp.hpp">
+      <Filter>Blocks\opencv-rgbd</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\opencv-rgbd\src\utils.h">
+      <Filter>Blocks\opencv-rgbd</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

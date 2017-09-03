@@ -56,7 +56,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\include;..\..\Cinder\include;..\..\Cinder\blocks;..\..\cinder\blocks\Cinder-OpenCV3\include;..\..\Cinder\blocks\Cinder-DepthSensor\include;..\..\Cinder\blocks\OSC\src;..\..\Cinder\blocks\Cinder-ImGui\include;..\..\Cinder\blocks\Cinder-ImGui\lib\imgui</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\include;..\..\Cinder\include;..\..\Cinder\blocks;..\..\cinder\blocks\Cinder-OpenCV3\include;..\..\Cinder\blocks\Cinder-DepthSensor\include;..\..\Cinder\blocks\OSC\src;..\..\Cinder\blocks\Cinder-ImGui\include;..\..\Cinder\blocks\Cinder-ImGui\lib\imgui;..\src\opencv-rgbd\include</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>RS_USE_WMF_BACKEND;WIN32;NDEBUG;_WINDOWS;NOMINMAX;_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -89,7 +89,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>..\include;..\..\Cinder\include;..\..\Cinder\blocks;..\..\cinder\blocks\Cinder-OpenCV3\include;..\..\Cinder\blocks\Cinder-DepthSensor\include;..\..\Cinder\blocks\OSC\src;..\..\Cinder\blocks\Cinder-ImGui\include;..\..\Cinder\blocks\Cinder-ImGui\lib\imgui</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\include;..\..\Cinder\include;..\..\Cinder\blocks;..\..\cinder\blocks\Cinder-OpenCV3\include;..\..\Cinder\blocks\Cinder-DepthSensor\include;..\..\Cinder\blocks\OSC\src;..\..\Cinder\blocks\Cinder-ImGui\include;..\..\Cinder\blocks\Cinder-ImGui\lib\imgui;..\src\opencv-rgbd\include</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>RS_USE_WMF_BACKEND;WIN32;NDEBUG;_WINDOWS;NOMINMAX;_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <PrecompiledHeader>
@@ -137,6 +137,26 @@
     <ClInclude Include="..\..\Cinder\blocks\Cinder-VNM\include\MiniConfig.h" />
     <ClInclude Include="..\..\Cinder\blocks\Cinder-VNM\include\MiniConfigImgui.h" />
     <ClInclude Include="..\include\Resources.h" />
+    <ClInclude Include="..\src\opencv-rgbd\include\opencv2\rgbd.hpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClInclude>
+    <ClInclude Include="..\src\opencv-rgbd\include\opencv2\rgbd\linemod.hpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClInclude>
+    <ClInclude Include="..\src\opencv-rgbd\src\depth_to_3d.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClInclude>
+    <ClInclude Include="..\src\opencv-rgbd\src\precomp.hpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClInclude>
+    <ClInclude Include="..\src\opencv-rgbd\src\utils.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Cinder\blocks\Cinder-ImGui\lib\ImGuizmo\ImGuizmo.cpp" />
@@ -147,6 +167,38 @@
     <ClCompile Include="..\..\Cinder\blocks\Cinder-VNM\src\AssetManager.cpp" />
     <ClCompile Include="..\..\Cinder\blocks\Cinder-VNM\src\MiniConfig.cpp" />
     <ClCompile Include="..\src\KinServerApp.cpp" />
+    <ClCompile Include="..\src\opencv-rgbd\src\depth_cleaner.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\src\opencv-rgbd\src\depth_registration.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\src\opencv-rgbd\src\depth_to_3d.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\src\opencv-rgbd\src\linemod.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\src\opencv-rgbd\src\normal.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\src\opencv-rgbd\src\odometry.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\src\opencv-rgbd\src\plane.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\src\opencv-rgbd\src\utils.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\assets\colorMap.fs" />
