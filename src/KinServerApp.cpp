@@ -227,9 +227,11 @@ public:
             }
         }
 
+#if DEMO_MODE == 1
         // HACK
         mLayout.canvases[0].offset({ DEPTH_ROI_X1 * getWindowWidth(), DEPTH_ROI_Y1 * getWindowHeight() });
         mLayout.canvases[2].offset({ DEPTH_ROI_X2 * getWindowWidth(), DEPTH_ROI_Y2 * getWindowHeight() });
+#endif
     }
 
     void draw() override
