@@ -258,7 +258,7 @@ public:
 
         if (mDepthTexture)
         {
-            gl::ScopedGlslProg prog(mDepthShader);
+            gl::ScopedGlslProg prog(DEPTH_AS_RGB ? am::glslProg("texture") : mDepthShader);
             gl::ScopedTextureBind tex0(mDepthTexture, 0);
             gl::drawSolidRect(mLayout.canvases[canvasIds[1]]);
             //gl::drawSolidRect(mLayout.canvases[canvasIds[0]], { DEPTH_ROI_X1, DEPTH_ROI_Y1 }, { DEPTH_ROI_X2, DEPTH_ROI_Y2 });
@@ -486,7 +486,30 @@ private:
             mDepthW = mDevice->getDepthSize().x;
             mDepthH = mDevice->getDepthSize().y;
         }
-        updateTexture(mDepthTexture, mDevice->depthChannel, getTextureFormatUINT16());
+        
+        if (!DEPTH_AS_RGB)
+        {
+            updateTexture(mDepthTexture, mDevice->depthChannel, getTextureFormatUINT16());
+        }
+        else
+        {
+            if (mDepthAsColorSurface.getWidth() == 0)
+            {
+                mDepthAsColorSurface = Surface(mDepthW, mDepthH, false, SurfaceChannelOrder::RGB);
+            }
+            
+            for (int y = 0; y < mDepthH; y++)
+            {
+                for (int x = 0; x < mDepthW; x++)
+                {
+                    uint16_t* src = mDevice->depthChannel.getData({x,y});
+                    uint8_t* dst = mDepthAsColorSurface.getData({ x, y });
+                    dst[0] = (*src) >> 8;
+                    dst[1] = (*src);
+                }
+            }
+            updateTexture(mDepthTexture, mDepthAsColorSurface);
+        }
         gl::checkError();
 
         float depthToMmScale = mDevice->getDepthToMmScale();
@@ -565,6 +588,8 @@ private:
     gl::TextureRef mDepthTexture;
     gl::TextureRef mColorTexture;
     gl::TextureRef mDepthToColorTableTexture;
+
+    Surface mDepthAsColorSurface;
 
     gl::GlslProgRef	mDepthShader, mColorShader;
 };

@@ -12,7 +12,7 @@ void main(void)
 { 
 #if 1
     float d = texture(uDepthTexture, TexCoord).r;
-    d = (d - uMinDepthForVizMM) / uMaxDepthForVizMM;
+    d = (d - uMinDepthForVizMM) / (uMaxDepthForVizMM - uMinDepthForVizMM);
     oColor = vec4(d, d, d, 1);
 #else
     int d = int(texture(uDepthTexture, TexCoord).r);

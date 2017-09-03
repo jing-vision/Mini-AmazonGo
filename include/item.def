@@ -11,6 +11,9 @@ ITEM_DEF(int, _WINDOW_HEIGHT, 810)
 ITEM_DEF(bool, FLIP_X, false)
 ITEM_DEF(bool, FLIP_Y, false)
 
+GROUP_DEF(Detection)
+ITEM_DEF(bool, DEPTH_AS_RGB, false)
+
 #if DEMO_MODE == 1
 ITEM_DEF_MINMAX(float, DEPTH_ROI_X1, 0, 0, 1)
 ITEM_DEF_MINMAX(float, DEPTH_ROI_Y1, 0, 0, 1)
