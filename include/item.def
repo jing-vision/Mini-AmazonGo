@@ -10,9 +10,10 @@ ITEM_DEF(int, _WINDOW_WIDTH, 1440)
 ITEM_DEF(int, _WINDOW_HEIGHT, 810)
 ITEM_DEF(bool, FLIP_X, false)
 ITEM_DEF(bool, FLIP_Y, false)
+ITEM_DEF(float, _FPS, 0)
 
 GROUP_DEF(Detection)
-ITEM_DEF(bool, DEPTH_AS_RGB, false)
+ITEM_DEF(bool, _DEPTH_AS_RGB, true)
 
 #if DEMO_MODE == 1
 ITEM_DEF_MINMAX(float, DEPTH_ROI_X1, 0, 0, 1)

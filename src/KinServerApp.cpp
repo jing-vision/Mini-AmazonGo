@@ -258,7 +258,7 @@ public:
 
         if (mDepthTexture)
         {
-            gl::ScopedGlslProg prog(DEPTH_AS_RGB ? am::glslProg("texture") : mDepthShader);
+            gl::ScopedGlslProg prog(_DEPTH_AS_RGB ? am::glslProg("texture") : mDepthShader);
             gl::ScopedTextureBind tex0(mDepthTexture, 0);
             gl::drawSolidRect(mLayout.canvases[canvasIds[1]]);
             //gl::drawSolidRect(mLayout.canvases[canvasIds[0]], { DEPTH_ROI_X1, DEPTH_ROI_Y1 }, { DEPTH_ROI_X2, DEPTH_ROI_Y2 });
@@ -355,7 +355,7 @@ public:
 
     void update() override
     {
-        mFps = getAverageFps();
+        _FPS = getAverageFps();
 
         if (MIN_DEPTH_FOR_VIZ_MM > MAX_DEPTH_FOR_VIZ_MM) MIN_DEPTH_FOR_VIZ_MM = MAX_DEPTH_FOR_VIZ_MM;
 
@@ -487,7 +487,7 @@ private:
             mDepthH = mDevice->getDepthSize().y;
         }
         
-        if (!DEPTH_AS_RGB)
+        if (!_DEPTH_AS_RGB)
         {
             updateTexture(mDepthTexture, mDevice->depthChannel, getTextureFormatUINT16());
         }
@@ -503,9 +503,16 @@ private:
                 for (int x = 0; x < mDepthW; x++)
                 {
                     uint16_t* src = mDevice->depthChannel.getData({x,y});
+                    float t = math<uint16_t>::clamp(*src, 0, 4000) / 4000.0f;
                     uint8_t* dst = mDepthAsColorSurface.getData({ x, y });
-                    dst[0] = (*src) >> 8;
-                    dst[1] = (*src);
+                    
+                    // https://twitter.com/Donzanoid/status/903424376707657730
+                    vec3 r = vec3(t) * 2.1f - vec3(1.8f, 1.14f, 0.3f);
+                    r = 1.0f - r * r;
+
+                    dst[0] = r.x * 255;
+                    dst[1] = r.y * 255;
+                    dst[2] = r.z * 255;
                 }
             }
             updateTexture(mDepthTexture, mDepthAsColorSurface);
