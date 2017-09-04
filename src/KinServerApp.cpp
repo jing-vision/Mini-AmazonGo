@@ -152,12 +152,12 @@ public:
     gl::TextureFontRef mFont;
 
     void setup() override
-    {
-        CI_LOG_V(gl::getVendorString());
-        CI_LOG_V(gl::getVersionString());
-        
+    {       
         const auto& args = getCommandLineArgs();
         log::makeLogger<log::LoggerFile>();
+
+        CI_LOG_I(gl::getVendorString());
+        CI_LOG_I(gl::getVersionString());
 
         mFont = FontHelper::createTextureFont();
 
